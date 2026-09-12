@@ -14,16 +14,40 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Unpack Trax+ source
+      - name: Find and unpack Trax+ source
         run: |
-          unzip -q "Trax-plus-source(2).zip"
+          ZIP_FILE="$(find . -maxdepth 1 -type f -name '*.zip' | head -n 1)"
 
-          rsync -av \
-            --exclude=".github/workflows/" \
-            "Trax-plus/" ./
+          if [ -z "$ZIP_FILE" ]; then
+            echo "No ZIP file found in repository root."
+            ls -la
+            exit 1
+          fi
 
-          rm -rf "Trax-plus"
-          rm "Trax-plus-source(2).zip"
+          echo "Found ZIP: $ZIP_FILE"
+
+          rm -rf unpacked
+          mkdir unpacked
+          unzip -q "$ZIP_FILE" -d unpacked
+
+          SOURCE_DIR="$(find unpacked -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+
+          if [ -n "$SOURCE_DIR" ]; then
+            echo "Project folder found: $SOURCE_DIR"
+
+            rsync -av \
+              --exclude=".github/workflows/" \
+              "$SOURCE_DIR/" ./
+          else
+            echo "No top-level project folder found; copying archive contents directly."
+
+            rsync -av \
+              --exclude=".github/workflows/" \
+              unpacked/ ./
+          fi
+
+          rm -rf unpacked
+          rm -f "$ZIP_FILE"
 
       - name: Commit unpacked files
         run: |
