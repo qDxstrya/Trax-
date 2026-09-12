@@ -1,0 +1,40 @@
+name: Unpack Trax+
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  unpack:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Unpack Trax+ source
+        run: |
+          unzip -q "Trax-plus-source(2).zip"
+
+          rsync -av \
+            --exclude=".github/workflows/" \
+            "Trax-plus/" ./
+
+          rm -rf "Trax-plus"
+          rm "Trax-plus-source(2).zip"
+
+      - name: Commit unpacked files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "Nothing to commit"
+          else
+            git commit -m "Unpack Trax+ source"
+            git push
+          fi
