@@ -2,7 +2,8 @@ import { create } from 'zustand'
 import { api, setRemoteAuth } from '../lib/api.js'
 import { localTZ } from '../lib/format.js'
 import { registerCustom } from '../lib/exercises.js'
-import { DEMO, DEMO_SEEDED } from '../lib/demo.js'
+import { STANDALONE, STANDALONE_FRESH } from '../lib/demo.js'
+import { resetStandaloneStorage } from '../lib/standalone.js'
 import { guestAllowed } from '../lib/guest.js'
 import { MOBILE, initReminderSync, nativeLoad, nativeSave, syncReminder, writeAutoBackup } from '../lib/mobile.js'
 import { loadRemote, chooseLocal, forgetRemote, connect } from '../lib/remote.js'
@@ -259,14 +260,6 @@ export const useStore = create((set, get) => {
       clearLocalSession()
     },
 
-    // Demo build only: drop the seeded example profile back in (Settings → "Reset demo data").
-    // Dynamic import so the generator never ships in a self-hosted bundle.
-    async resetDemo() {
-      const { buildDemoState } = await import('../lib/demoSeed.js')
-      localStorage.removeItem('gym_dirty')
-      persist(Object.assign(clone(DEF), buildDemoState()), false)
-    },
-
     // Boot: ask the server who we are, then pull.
     async boot() {
       // Mobile build: no backend by default — restore from the file mirror (the durable copy;
@@ -309,12 +302,14 @@ export const useStore = create((set, get) => {
         set({ ready: true, needsMobileOnboarding: !remote && !hasData(get().S) })
         return
       }
-      // Demo build (GitHub Pages): no backend at all — seed once, stay in guest mode.
-      if (DEMO) {
-        if (!localStorage.getItem(DEMO_SEEDED)) {
-          localStorage.setItem(DEMO_SEEDED, '1')
-          await get().resetDemo()
-        }
+      // Static Trax+ build: no backend and no demo seed. On the first launch of this final
+      // release, remove every browser key that can contain an old profile, demo history or
+      // in-progress session, then write the empty default state. The versioned marker makes
+      // this reset happen exactly once: workouts logged after this point survive every reload
+      // and normal redeploy. Built-in exercises and optional starter-plan templates are source
+      // data, not stored profile data, so they remain available.
+      if (STANDALONE) {
+        resetStandaloneStorage(localStorage, STANDALONE_FRESH, () => persist(clone(DEF), false))
         get().setGuest(true)
         set({ ready: true })
         return
